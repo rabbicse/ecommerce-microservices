@@ -3,6 +3,7 @@ package handlers
 import (
 	"ecommerce-service/internal/api/rest"
 	"ecommerce-service/internal/dto"
+	"ecommerce-service/internal/repository"
 	"ecommerce-service/internal/service"
 	"net/http"
 
@@ -18,7 +19,9 @@ func SetupUserRoutes(rh *rest.RestHandler) {
 	app := rh.App
 
 	// create an istance of user service & inject to handler
-	svc := service.UserService{}
+	svc := service.UserService{
+		Repository: repository.NewUserRepository(rh.DB),
+	}
 	handler := UserHandler{
 		svc: svc,
 	}

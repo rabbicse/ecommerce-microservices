@@ -3,10 +3,13 @@ package service
 import (
 	"ecommerce-service/internal/domain"
 	"ecommerce-service/internal/dto"
+	"ecommerce-service/internal/repository"
+	"fmt"
 	"log"
 )
 
 type UserService struct {
+	Repository repository.UserRepository
 }
 
 func (s UserService) FindUserByEmail(email string) (*domain.User, error) {
@@ -15,9 +18,19 @@ func (s UserService) FindUserByEmail(email string) (*domain.User, error) {
 	return nil, nil
 }
 
-func (s UserService) Signup(input dto.UserSignup) (string, error) {
+func (service UserService) Signup(input dto.UserSignup) (string, error) {
 	log.Println(input)
-	return "this-is-my-token-as-of-now", nil
+
+	user, err := service.Repository.CreateUser(domain.User{
+		Email:    input.Email,
+		Password: input.Password,
+		Phone:    input.Phone,
+	})
+
+	// generate token
+	log.Println(user)
+	userInfo := fmt.Sprintf("%v,%v,%v", user.ID, user.Email, user.UserType)
+	return userInfo, err
 }
 
 func (s UserService) Login(input any) (string, error) {
