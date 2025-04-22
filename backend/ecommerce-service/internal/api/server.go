@@ -5,6 +5,7 @@ import (
 	"ecommerce-service/internal/api/rest"
 	"ecommerce-service/internal/api/rest/handlers"
 	"ecommerce-service/internal/domain"
+	"ecommerce-service/internal/helper"
 	"log"
 	"net/http"
 
@@ -25,11 +26,14 @@ func StartServer(config configs.AppConfig) {
 	// run migration
 	db.AutoMigrate(&domain.User{})
 
+	auth := helper.SetupAuth(config.AppSecret)
+
 	app.Get("/health", HealthCheck)
 
 	restHandler := &rest.RestHandler{
-		App: app,
-		DB:  db,
+		App:  app,
+		DB:   db,
+		Auth: auth,
 	}
 
 	setupRoutes(restHandler)

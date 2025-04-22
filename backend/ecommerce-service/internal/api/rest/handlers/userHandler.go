@@ -5,6 +5,7 @@ import (
 	"ecommerce-service/internal/dto"
 	"ecommerce-service/internal/repository"
 	"ecommerce-service/internal/service"
+	"log"
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
@@ -21,6 +22,7 @@ func SetupUserRoutes(rh *rest.RestHandler) {
 	// create an istance of user service & inject to handler
 	svc := service.UserService{
 		Repository: repository.NewUserRepository(rh.DB),
+		Auth:       rh.Auth,
 	}
 	handler := UserHandler{
 		svc: svc,
@@ -60,6 +62,7 @@ func (h *UserHandler) Register(ctx *fiber.Ctx) error {
 
 	token, err := h.svc.Signup(user)
 	if err != nil {
+		log.Println(err)
 		return ctx.Status(http.StatusInternalServerError).JSON(&fiber.Map{
 			"message": "error on signup",
 		})
@@ -71,8 +74,26 @@ func (h *UserHandler) Register(ctx *fiber.Ctx) error {
 }
 
 func (h *UserHandler) Login(ctx *fiber.Ctx) error {
+	user := dto.UserLogin{}
+	err := ctx.BodyParser(&user)
+	log.Println(err)
+
+	if err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(&fiber.Map{
+			"message": "please provide valid inputs",
+		})
+	}
+
+	token, err := h.svc.Login(user.Email, user.Password)
+	if err != nil {
+		return ctx.Status(http.StatusUnauthorized).JSON(&fiber.Map{
+			"message": "error on login",
+		})
+	}
+
 	return ctx.Status(http.StatusOK).JSON(&fiber.Map{
 		"message": "login",
+		"token":   token,
 	})
 }
 

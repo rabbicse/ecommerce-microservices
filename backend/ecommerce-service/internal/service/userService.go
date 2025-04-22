@@ -3,38 +3,59 @@ package service
 import (
 	"ecommerce-service/internal/domain"
 	"ecommerce-service/internal/dto"
+	"ecommerce-service/internal/helper"
 	"ecommerce-service/internal/repository"
-	"fmt"
+	"errors"
 	"log"
 )
 
 type UserService struct {
 	Repository repository.UserRepository
+	Auth       helper.Auth
 }
 
-func (s UserService) FindUserByEmail(email string) (*domain.User, error) {
+func (service UserService) findUserByEmail(email string) (*domain.User, error) {
 	// perform some db operation
+	user, err := service.Repository.FindUserByEmail(email)
 	// business logic
-	return nil, nil
+	return &user, err
 }
 
 func (service UserService) Signup(input dto.UserSignup) (string, error) {
-	log.Println(input)
+	hashedPassword, err := service.Auth.CreateHashedPassword(input.Password)
+	if err != nil {
+		log.Println(err)
+		return "", err
+	}
 
 	user, err := service.Repository.CreateUser(domain.User{
 		Email:    input.Email,
-		Password: input.Password,
+		Password: hashedPassword,
 		Phone:    input.Phone,
 	})
 
+	if err != nil {
+		log.Println(err)
+	}
+
 	// generate token
-	log.Println(user)
-	userInfo := fmt.Sprintf("%v,%v,%v", user.ID, user.Email, user.UserType)
-	return userInfo, err
+	return service.Auth.GenerateToken(user.ID, user.Email, user.UserType)
 }
 
-func (s UserService) Login(input any) (string, error) {
-	return "", nil
+func (service UserService) Login(email string, password string) (string, error) {
+	user, err := service.findUserByEmail(email)
+	if err != nil {
+		return "", errors.New("user does not exist with the provided email id")
+	}
+
+	// compare password and generate token
+	err = service.Auth.VerifyPassword(password, user.Password)
+	if err != nil {
+		return "", err
+	}
+
+	// generate token
+	return service.Auth.GenerateToken(user.ID, email, user.UserType)
 }
 
 func (s UserService) GetVerificationCode(e domain.User) (int, error) {
