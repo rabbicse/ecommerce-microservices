@@ -7,6 +7,7 @@ import (
 	"ecommerce-service/internal/repository"
 	"errors"
 	"log"
+	"time"
 )
 
 type UserService struct {
@@ -58,11 +59,76 @@ func (service UserService) Login(email string, password string) (string, error) 
 	return service.Auth.GenerateToken(user.ID, email, user.UserType)
 }
 
+func (s UserService) isVerifiedUser(id uint) bool {
+
+	currentUser, err := s.Repository.FindUserById(id)
+
+	return err == nil && currentUser.Verified
+}
+
 func (s UserService) GetVerificationCode(e domain.User) (int, error) {
-	return 0, nil
+	// if user already verified
+	if s.isVerifiedUser(e.ID) {
+		return 0, errors.New("user already verified")
+	}
+
+	// generate verification code
+	code, err := s.Auth.GenerateCode()
+	if err != nil {
+		return 0, err
+	}
+
+	// update user
+	user := domain.User{
+		Expiry: time.Now().Add(30 * time.Minute),
+		Code:   code,
+	}
+
+	_, err = s.Repository.UpdateUser(e.ID, user)
+
+	if err != nil {
+		return 0, errors.New("unable to update verification code")
+	}
+
+	// user, _ = s.Repository.FindUserById(e.ID)
+
+	// send sms
+
+	// return verification code
+	return code, nil
 }
 
 func (s UserService) VerifyCode(id uint, code int) error {
+	// if user already verified
+	if s.isVerifiedUser(id) {
+		log.Println("verified...")
+		return errors.New("user already verified")
+	}
+
+	user, err := s.Repository.FindUserById(id)
+
+	if err != nil {
+		return err
+	}
+
+	if user.Code != code {
+		return errors.New("verification code does not match")
+	}
+
+	if !time.Now().Before(user.Expiry) {
+		return errors.New("verification code expired")
+	}
+
+	updateUser := domain.User{
+		Verified: true,
+	}
+
+	_, err = s.Repository.UpdateUser(id, updateUser)
+
+	if err != nil {
+		return errors.New("unable to verify user")
+	}
+
 	return nil
 }
 

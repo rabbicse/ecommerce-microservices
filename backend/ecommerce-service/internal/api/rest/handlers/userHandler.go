@@ -28,26 +28,29 @@ func SetupUserRoutes(rh *rest.RestHandler) {
 		svc: svc,
 	}
 
-	// Public endpoints
-	app.Post("/register", handler.Register)
+	pubRoutes := app.Group("/users")
 
-	app.Post("/login", handler.Login)
+	// Public endpoints
+	pubRoutes.Post("/register", handler.Register)
+	pubRoutes.Post("/login", handler.Login)
+
+	pvtRoutes := pubRoutes.Group("/", rh.Auth.Authorize)
 
 	// Private endpoints
-	app.Get("/verify", handler.GetVerificationCode)
-	app.Post("/verify", handler.Verify)
+	pvtRoutes.Get("/verify", handler.GetVerificationCode)
+	pvtRoutes.Post("/verify", handler.Verify)
 
-	app.Get("/profile", handler.GetProfile)
-	app.Post("/profile", handler.CreateProfile)
+	pvtRoutes.Get("/profile", handler.GetProfile)
+	pvtRoutes.Post("/profile", handler.CreateProfile)
 
-	app.Get("/cart", handler.GetCart)
-	app.Post("/cart", handler.AddToCart)
+	pvtRoutes.Get("/cart", handler.GetCart)
+	pvtRoutes.Post("/cart", handler.AddToCart)
 
-	app.Post("/order", handler.CreateOrder)
-	app.Get("/order", handler.GetOrders)
-	app.Get("/order/:id", handler.GetOrder)
+	pvtRoutes.Post("/order", handler.CreateOrder)
+	pvtRoutes.Get("/order", handler.GetOrders)
+	pvtRoutes.Get("/order/:id", handler.GetOrder)
 
-	app.Post("/become-seller", handler.BecomeSeller)
+	pvtRoutes.Post("/become-seller", handler.BecomeSeller)
 }
 
 func (h *UserHandler) Register(ctx *fiber.Ctx) error {
@@ -98,14 +101,45 @@ func (h *UserHandler) Login(ctx *fiber.Ctx) error {
 }
 
 func (h *UserHandler) GetVerificationCode(ctx *fiber.Ctx) error {
+	user := h.svc.Auth.GetCurrentUser(ctx)
+
+	// create verification code and update to user profile in DB
+	code, err := h.svc.GetVerificationCode(user)
+
+	if err != nil {
+		return ctx.Status(http.StatusInternalServerError).JSON(&fiber.Map{
+			"message": "unable to generate verification code",
+		})
+	}
+
 	return ctx.Status(http.StatusOK).JSON(&fiber.Map{
-		"message": "verify",
+		"message": "get verification code",
+		"code":    code,
 	})
 }
 
 func (h *UserHandler) Verify(ctx *fiber.Ctx) error {
+	user := h.svc.Auth.GetCurrentUser(ctx)
+
+	// request
+	var req dto.VerificationCodeInput
+
+	if err := ctx.BodyParser(&req); err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(&fiber.Map{
+			"message": "please provide a valid input",
+		})
+	}
+
+	err := h.svc.VerifyCode(user.ID, req.Code)
+
+	if err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(&fiber.Map{
+			"message": err,
+		})
+	}
+
 	return ctx.Status(http.StatusOK).JSON(&fiber.Map{
-		"message": "verify",
+		"message": "verified successfully",
 	})
 }
 
